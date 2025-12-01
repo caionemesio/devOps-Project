@@ -32,11 +32,12 @@ EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --quiet --tries=1 --spider http://localhost:3000/tasks || exit 1
+  CMD wget --quiet --tries=1 --spider http://localhost:3000/health || exit 1
 
 # Usa dumb-init para lidar com sinais corretamente
 ENTRYPOINT ["dumb-init", "--"]
 
 # Inicia a aplicação em modo produção
 CMD ["node", "server.js"]
+
 
