@@ -18,6 +18,9 @@ RUN npm run build
 # Etapa 2: Nginx para servir arquivos estáticos
 FROM nginx:alpine
 
+# Instala wget para health checks
+RUN apk add --no-cache wget
+
 # Copia build do React
 COPY --from=builder /app/dist /usr/share/nginx/html
 
