@@ -1,0 +1,42 @@
+# ========================================
+# DOCKERFILE DE PRODUÇÃO - BACKEND
+# Otimizado para produção
+# ========================================
+
+FROM node:20-alpine
+
+# Instala dependências do sistema necessárias
+RUN apk add --no-cache python3 make g++ dumb-init
+
+# Define diretório de trabalho
+WORKDIR /app
+
+# Copia arquivos de dependências
+COPY package*.json ./
+
+# Instala apenas dependências de produção
+RUN npm ci --only=production
+
+# Copia o código fonte
+COPY . .
+
+# Cria diretório para o banco de dados
+RUN mkdir -p /app/src/db_data
+
+# Define variáveis de ambiente
+ENV NODE_ENV=production \
+    PORT=3000
+
+# Expõe a porta
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:3000/tasks || exit 1
+
+# Usa dumb-init para lidar com sinais corretamente
+ENTRYPOINT ["dumb-init", "--"]
+
+# Inicia a aplicação em modo produção
+CMD ["node", "server.js"]
+
