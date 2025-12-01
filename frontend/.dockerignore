@@ -3,13 +3,14 @@ node_modules
 npm-debug.log
 yarn-error.log
 
+# Build
+dist
+build
+
 # Ambiente
 .env
 .env.local
 .env.*.local
-
-# Database (desenvolvimento)
-src/db_data/*.db
 
 # Git
 .git
@@ -35,3 +36,4 @@ coverage
 
 # Documentação
 README.md
+
