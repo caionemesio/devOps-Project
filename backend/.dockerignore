@@ -1,0 +1,37 @@
+# Node
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Ambiente
+.env
+.env.local
+.env.*.local
+
+# Database (desenvolvimento)
+src/db_data/*.db
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Testes
+coverage
+.nyc_output
+
+# Documentação
+README.md
