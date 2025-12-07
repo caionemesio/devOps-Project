@@ -1,13 +1,6 @@
 # ========================================
 # DOCKER COMPOSE - PRODUÇÃO COM POSTGRESQL
 # ========================================
-# Para usar: docker-compose -f docker-compose.prod.yml up -d
-#
-# ⚠️  IMPORTANTE: Arquivo .env é OBRIGATÓRIO!
-# Crie o arquivo .env na raiz do projeto com:
-#   POSTGRES_DB=tasks_db
-#   POSTGRES_USER=app_user
-#   POSTGRES_PASSWORD=sua_senha_forte_aqui
 
 version: '3.9'
 

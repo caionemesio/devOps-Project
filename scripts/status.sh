@@ -54,3 +54,6 @@ docker compose -f docker-compose.prod.yml ps --format json | grep -o '"Published
 echo ""
 
 
+
+
+
