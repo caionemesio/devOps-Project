@@ -2,6 +2,12 @@
 # DOCKER COMPOSE - PRODUÇÃO COM POSTGRESQL
 # ========================================
 # Para usar: docker-compose -f docker-compose.prod.yml up -d
+#
+# ⚠️  IMPORTANTE: Arquivo .env é OBRIGATÓRIO!
+# Crie o arquivo .env na raiz do projeto com:
+#   POSTGRES_DB=tasks_db
+#   POSTGRES_USER=app_user
+#   POSTGRES_PASSWORD=sua_senha_forte_aqui
 
 version: '3.9'
 
@@ -12,9 +18,9 @@ services:
     container_name: postgres-production
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-tasks_db}
-      POSTGRES_USER: ${POSTGRES_USER:-app_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -23,7 +29,7 @@ services:
       test:
         [
           'CMD-SHELL',
-          'pg_isready -U ${POSTGRES_USER:-app_user} -d ${POSTGRES_DB:-tasks_db}',
+          'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}',
         ]
       interval: 10s
       timeout: 5s
@@ -42,7 +48,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-change_me_in_production}@db:5432/${POSTGRES_DB:-tasks_db}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     networks:
       - app-network
     depends_on:
