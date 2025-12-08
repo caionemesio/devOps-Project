@@ -191,6 +191,7 @@ services:
     image: zabbix/zabbix-agent2:alpine-7.0-latest
     container_name: zabbix-agent
     restart: unless-stopped
+    user: "0"  # Roda como root para acessar Docker socket
     ports:
       - '10050:10050'
     environment:
