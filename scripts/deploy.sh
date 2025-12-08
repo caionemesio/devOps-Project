@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # ========================================
-# Script de Deploy - Produção
+# Script de Deploy - Produção Completa
+# Aplicação + Monitoramento (Zabbix + Grafana)
 # ========================================
 
 set -e  # Para em caso de erro
 
-echo "🚀 Iniciando deploy em produção..."
+echo "🚀 Iniciando deploy completo em produção..."
 
 # Cores para output
 GREEN='\033[0;32m'
@@ -33,27 +34,69 @@ docker image prune -f
 echo -e "${YELLOW}🏗️  Construindo e iniciando containers...${NC}"
 docker compose -f docker-compose.prod.yml up -d --build
 
+# Criar diretórios necessários para Grafana
+echo -e "${YELLOW}📁 Criando estrutura de diretórios do monitoramento...${NC}"
+mkdir -p monitoring/grafana/provisioning/{dashboards,datasources}
+
 # Aguardar containers ficarem saudáveis
-echo -e "${YELLOW}⏳ Aguardando containers iniciarem...${NC}"
-sleep 10
+echo -e "${YELLOW}⏳ Aguardando containers iniciarem (pode levar até 2 minutos)...${NC}"
+sleep 30
 
 # Verificar status
 echo -e "${YELLOW}📊 Verificando status dos containers...${NC}"
 docker compose -f docker-compose.prod.yml ps
 
-# Verificar health
+# Verificar health - Aplicação
 BACKEND_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' backend-production 2>/dev/null || echo "unknown")
 FRONTEND_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' frontend-production 2>/dev/null || echo "unknown")
 
+# Verificar health - Monitoramento
+ZABBIX_SERVER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' zabbix-server 2>/dev/null || echo "unknown")
+ZABBIX_WEB_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' zabbix-web 2>/dev/null || echo "unknown")
+GRAFANA_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' grafana 2>/dev/null || echo "unknown")
+
+# Obter IP público da instância EC2 (se estiver na AWS)
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 2>/dev/null || echo "localhost")
+
 echo ""
-echo -e "${GREEN}✅ Deploy concluído!${NC}"
+echo -e "${GREEN}✅ Deploy completo concluído!${NC}"
 echo ""
-echo "Status dos serviços:"
-echo "  Backend:  ${BACKEND_HEALTH}"
-echo "  Frontend: ${FRONTEND_HEALTH}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}📊 STATUS DOS SERVIÇOS${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo "Para ver os logs:"
-echo "  docker compose -f docker-compose.prod.yml logs -f"
+echo -e "${YELLOW}Aplicação:${NC}"
+echo "  Backend:       ${BACKEND_HEALTH}"
+echo "  Frontend:      ${FRONTEND_HEALTH}"
+echo ""
+echo -e "${YELLOW}Monitoramento:${NC}"
+echo "  Zabbix Server: ${ZABBIX_SERVER_HEALTH}"
+echo "  Zabbix Web:    ${ZABBIX_WEB_HEALTH}"
+echo "  Grafana:       ${GRAFANA_HEALTH}"
+echo ""
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}🌐 URLs DE ACESSO${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "${YELLOW}Aplicação:${NC}"
+echo "  http://${PUBLIC_IP}"
+echo ""
+echo -e "${YELLOW}Zabbix:${NC}"
+echo "  http://${PUBLIC_IP}:8080"
+echo "  Usuário: Admin"
+echo "  Senha: zabbix ${RED}(altere no primeiro acesso!)${NC}"
+echo ""
+echo -e "${YELLOW}Grafana:${NC}"
+echo "  http://${PUBLIC_IP}:3001"
+echo "  Usuário: admin (ou valor do .env)"
+echo "  Senha: (valor do .env)"
+echo ""
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "${YELLOW}💡 Comandos úteis:${NC}"
+echo "  Ver logs:   docker compose -f docker-compose.prod.yml logs -f"
+echo "  Ver status: ./scripts/status.sh"
+echo "  Parar tudo: docker compose -f docker-compose.prod.yml down"
 echo ""
 
 
