@@ -1,0 +1,135 @@
+# ========================================
+# DOCKER COMPOSE - APLICAÇÃO
+# Para EC2 #1 (Servidor de Aplicação)
+# ========================================
+
+version: '3.9'
+
+services:
+  # ==========================================
+  # APLICAÇÃO PRINCIPAL
+  # ==========================================
+
+  # PostgreSQL Database - Aplicação
+  db:
+    image: postgres:16-alpine
+    container_name: postgres-production
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: backend-production
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    networks:
+      - app-network
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:3000/health',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend com Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      args:
+        - VITE_API_URL=/api
+    container_name: frontend-production
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app-network
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:80',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================
+  # MONITORAMENTO - ZABBIX AGENT
+  # ==========================================
+
+  # Zabbix Agent (monitora esta instância remotamente)
+  zabbix-agent:
+    image: zabbix/zabbix-agent2:alpine-7.0-latest
+    container_name: zabbix-agent
+    restart: unless-stopped
+    user: '0' # Roda como root para acessar Docker socket
+    ports:
+      - '10050:10050'
+    environment:
+      - ZBX_HOSTNAME=App-Server
+      - ZBX_SERVER_HOST=${ZABBIX_SERVER_IP} # IP da EC2 de monitoramento
+      - ZBX_SERVER_PORT=10051
+      - ZBX_ACTIVE_ALLOW=true
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /dev:/host/dev:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - app-network
+    privileged: true
+
+# ==========================================
+# VOLUMES
+# ==========================================
+volumes:
+  postgres_data:
+    driver: local
+
+# ==========================================
+# NETWORKS
+# ==========================================
+networks:
+  app-network:
+    driver: bridge

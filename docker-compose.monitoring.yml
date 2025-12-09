@@ -1,0 +1,167 @@
+# ========================================
+# DOCKER COMPOSE - MONITORAMENTO
+# Para EC2 #2 (Servidor de Monitoramento)
+# ========================================
+
+version: '3.9'
+
+services:
+  # ==========================================
+  # MONITORAMENTO - ZABBIX
+  # ==========================================
+
+  # Zabbix PostgreSQL Database
+  zabbix-postgres:
+    image: postgres:16-alpine
+    container_name: zabbix-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${ZABBIX_DB_USER:-zabbix}
+      - POSTGRES_PASSWORD=${ZABBIX_DB_PASSWORD:-zabbix_password}
+      - POSTGRES_DB=${ZABBIX_DB_NAME:-zabbix}
+    volumes:
+      - zabbix_postgres_data:/var/lib/postgresql/data
+    networks:
+      - monitoring-network
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${ZABBIX_DB_USER:-zabbix} -d ${ZABBIX_DB_NAME:-zabbix}',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Zabbix Server
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:alpine-7.0-latest
+    container_name: zabbix-server
+    restart: unless-stopped
+    ports:
+      - '10051:10051' # Deve estar acessível pela EC2 da aplicação
+    environment:
+      - DB_SERVER_HOST=zabbix-postgres
+      - POSTGRES_USER=${ZABBIX_DB_USER:-zabbix}
+      - POSTGRES_PASSWORD=${ZABBIX_DB_PASSWORD:-zabbix_password}
+      - POSTGRES_DB=${ZABBIX_DB_NAME:-zabbix}
+      - ZBX_ENABLE_SNMP_TRAPS=true
+    volumes:
+      - zabbix_server_data:/var/lib/zabbix
+      - zabbix_modules:/var/lib/zabbix/modules
+      - zabbix_enc:/var/lib/zabbix/enc
+      - zabbix_ssh_keys:/var/lib/zabbix/ssh_keys
+      - zabbix_ssl_certs:/var/lib/zabbix/ssl/certs
+      - zabbix_ssl_keys:/var/lib/zabbix/ssl/keys
+    networks:
+      - monitoring-network
+    depends_on:
+      zabbix-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'zabbix_server', '-R', 'config_cache_reload']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Zabbix Web Interface
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:alpine-7.0-latest
+    container_name: zabbix-web
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    environment:
+      - DB_SERVER_HOST=zabbix-postgres
+      - POSTGRES_USER=${ZABBIX_DB_USER:-zabbix}
+      - POSTGRES_PASSWORD=${ZABBIX_DB_PASSWORD:-zabbix_password}
+      - POSTGRES_DB=${ZABBIX_DB_NAME:-zabbix}
+      - ZBX_SERVER_HOST=zabbix-server
+      - ZBX_SERVER_PORT=10051
+      - PHP_TZ=America/Sao_Paulo
+    volumes:
+      - zabbix_web_data:/usr/share/zabbix
+    networks:
+      - monitoring-network
+    depends_on:
+      - zabbix-server
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8080']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ==========================================
+  # MONITORAMENTO - GRAFANA
+  # ==========================================
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - '3001:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=alexanderzobnin-zabbix-app
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - grafana_config:/etc/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - monitoring-network
+    depends_on:
+      - zabbix-server
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'wget',
+          '--quiet',
+          '--tries=1',
+          '--spider',
+          'http://localhost:3000/api/health',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# ==========================================
+# VOLUMES
+# ==========================================
+volumes:
+  zabbix_postgres_data:
+    driver: local
+  zabbix_server_data:
+    driver: local
+  zabbix_modules:
+    driver: local
+  zabbix_enc:
+    driver: local
+  zabbix_ssh_keys:
+    driver: local
+  zabbix_ssl_certs:
+    driver: local
+  zabbix_ssl_keys:
+    driver: local
+  zabbix_web_data:
+    driver: local
+  grafana_data:
+    driver: local
+  grafana_config:
+    driver: local
+
+# ==========================================
+# NETWORKS
+# ==========================================
+networks:
+  monitoring-network:
+    driver: bridge
